@@ -9,6 +9,7 @@
 #include "eventer.h"
 
 #define POST_WAIT_MS 0
+#define MIN_MS 1
 
 static char TAG[] = "EVENTER";
 class EvLoopEvent
@@ -61,6 +62,11 @@ static void calculate_next_timeout(EvLoopEvent *ev)
 
 static void setup_period(EvLoopEvent *evp, int ms)
 {
+    if (ms < MIN_MS)
+    {
+        ESP_LOGE(TAG, "Period time %d too small, set to %d", ms, MIN_MS);
+        ms = MIN_MS;
+    }
     evp->period_us = ms * 1000;
     evp->start_time_us = esp_timer_get_time();
     evp->period_counter = 0;
@@ -72,13 +78,19 @@ bool evloop_post(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base
     {
         esp_err_t err = esp_event_post(loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
         if (ESP_OK != err)
+        {
+            ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s", id, loop_base);
             return false;
+        }
     }
     else
     {
         esp_err_t err = esp_event_post_to(loop_handle, loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
         if (ESP_OK != err)
+        {
+            ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s", id, loop_base);
             return false;
+        }
     }
     return true;
 }
@@ -97,7 +109,11 @@ static void event_task(void *)
         {
             auto ev = eventList.front();
             int64_t sleep_time_us = ev->next_timeout_us - esp_timer_get_time();
-            ticks = (sleep_time_us / 1000) / portTICK_PERIOD_MS;
+            // If the task is running late, don't sleep
+            if (sleep_time_us < 0)
+                ticks = 0;
+            else
+                ticks = (sleep_time_us / 1000) / portTICK_PERIOD_MS;
             // ESP_LOGI(TAG, "sleep_time %lld us", sleep_time_us);
         }
 
@@ -149,7 +165,7 @@ static void event_task(void *)
 
 eventer_t eventer_add(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int ms, bool periodic, int id, void *data, size_t data_size)
 {
-    if (ms < 1)
+    if (ms < MIN_MS)
     {
         ESP_LOGE(TAG, "%s: Invalid period, must be 1 or bigger", __func__);
         return NULL;
@@ -186,9 +202,9 @@ bool eventer_set_period(eventer_t ev, int ms)
         return false;
 
     auto evp = (EvLoopEvent *)ev;
-    if (ms < 1)
+    if (ms < MIN_MS)
     {
-        ESP_LOGE(TAG, "%s: Invalid period, must be 1 or bigger", __func__);
+        ESP_LOGE(TAG, "%s: Invalid period, must be %d or bigger", __func__, ms);
         return false;
     }
     queue_msg_t msg = {.cmd = CMD_NEW_PERIOD, .evp = evp, .new_period_ms = ms};
