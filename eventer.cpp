@@ -8,8 +8,8 @@
 
 #include "eventer.h"
 
-#define POST_WAIT_MS 0
-#define MIN_MS 1
+#define MIN_MS 5
+#define POST_WAIT_MS MIN_MS
 
 static char TAG[] = "EVENTER";
 class EvLoopEvent
@@ -72,27 +72,26 @@ static void setup_period(EvLoopEvent *evp, int ms)
     evp->period_counter = 0;
 }
 
-bool evloop_post(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int32_t id, void *data, size_t data_size)
+static esp_err_t evloop_post(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int32_t id, void *data, size_t data_size)
 {
+    esp_err_t err = ESP_OK;
     if (loop_handle == NULL)
     {
-        esp_err_t err = esp_event_post(loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
+        err = esp_event_post(loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
         if (ESP_OK != err)
         {
-            ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s", id, loop_base);
-            return false;
+            //ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s: %s", id, loop_base, esp_err_to_name(err));
         }
     }
     else
     {
-        esp_err_t err = esp_event_post_to(loop_handle, loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
+        err = esp_event_post_to(loop_handle, loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
         if (ESP_OK != err)
         {
-            ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s", id, loop_base);
-            return false;
+            //ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s: %s", id, loop_base, esp_err_to_name(err));
         }
     }
-    return true;
+    return err;
 }
 static void event_task(void *)
 {
@@ -149,8 +148,7 @@ static void event_task(void *)
 
             auto ev = eventList.front();
             // ESP_LOGW(TAG, "Posting %lld us timer to %s", ev->period_us, ev->loop_base);
-            if (!evloop_post(ev->loop_handle, ev->loop_base, ev->id, ev->data, ev->data_size))
-                ESP_LOGE(TAG, "eventer: Failed posting event %d to %s", ev->id, ev->loop_base);
+            evloop_post(ev->loop_handle, ev->loop_base, ev->id, ev->data, ev->data_size);
             if (ev->periodic)
                 calculate_next_timeout(ev);
             else
