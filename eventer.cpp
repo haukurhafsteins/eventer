@@ -74,25 +74,11 @@ static void setup_period(EvLoopEvent *evp, int ms)
 
 static esp_err_t evloop_post(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int32_t id, void *data, size_t data_size)
 {
-    esp_err_t err = ESP_OK;
     if (loop_handle == NULL)
-    {
-        err = esp_event_post(loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
-        if (ESP_OK != err)
-        {
-            //ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s: %s", id, loop_base, esp_err_to_name(err));
-        }
-    }
-    else
-    {
-        err = esp_event_post_to(loop_handle, loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
-        if (ESP_OK != err)
-        {
-            //ESP_LOGE(TAG, "eventer: Failed posting event %ld to %s: %s", id, loop_base, esp_err_to_name(err));
-        }
-    }
-    return err;
+        return esp_event_post(loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
+    return esp_event_post_to(loop_handle, loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
 }
+
 static void event_task(void *)
 {
     queue_msg_t msg;
