@@ -205,7 +205,7 @@ bool eventer_set_period(eventer_t ev, int ms)
 
 void eventer_init()
 {
-    xEventQueue = xQueueCreate(5, sizeof(queue_msg_t));
+    xEventQueue = xQueueCreate(20, sizeof(queue_msg_t));
     if (xTaskCreate(&event_task, "eventer", 1024 * 4, NULL, 15, NULL) != pdPASS)
         ESP_LOGI(TAG, "%s: Error starting Eventer", __func__);
 }
