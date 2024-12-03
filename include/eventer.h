@@ -1,5 +1,8 @@
 #ifndef __eventer_h__
 #define __eventer_h__
+#include <stdbool.h>
+#include <stddef.h>
+#include "esp_event.h"
 #ifdef __cplusplus
 extern "C"
 {
