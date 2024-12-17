@@ -134,7 +134,9 @@ static void event_task(void *)
 
             auto ev = eventList.front();
             // ESP_LOGW(TAG, "Posting %lld us timer to %s", ev->period_us, ev->loop_base);
-            evloop_post(ev->loop_handle, ev->loop_base, ev->id, ev->data, ev->data_size);
+            esp_err_t err = evloop_post(ev->loop_handle, ev->loop_base, ev->id, ev->data, ev->data_size);
+            if (err != ESP_OK)
+                ESP_LOGE(TAG, "Failed to send event %d to %s",ev->id, ev->loop_base);
             if (ev->periodic)
                 calculate_next_timeout(ev);
             else
