@@ -109,6 +109,7 @@ static void event_task(void *)
             case CMD_REMOVE:
                 // ESP_LOGW(TAG, "Removing %s", msg.evp->loop_base);
                 eventList.remove(msg.evp);
+                delete msg.evp;
                 break;
             case CMD_ADD:
                 // ESP_LOGI(TAG, "%s: Adding %lld us (periodic=%d) timer for %s", __func__, msg.evp->period_us, msg.evp->periodic, msg.evp->loop_base);
@@ -168,8 +169,10 @@ eventer_t eventer_add(esp_event_loop_handle_t loop_handle, esp_event_base_t loop
     calculate_next_timeout(evp);
 
     queue_msg_t msg = {CMD_ADD, evp, 0};
-    xQueueSend(xEventQueue, &msg, 0);
-    return (eventer_t)evp;
+    if (pdTRUE == xQueueSend(xEventQueue, &msg, 0))
+        return (eventer_t)evp;
+    delete evp;
+    return NULL;
 }
 
 eventer_t eventer_add_periodic(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, esp_event_handler_t event_handler, int id, int ms, void *data, size_t data_size)
