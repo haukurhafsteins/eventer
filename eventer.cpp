@@ -23,7 +23,7 @@ public:
     int period_counter;
     bool periodic;
     int id;
-    void *data;
+    void* data;
     size_t data_size;
 };
 
@@ -38,29 +38,29 @@ typedef enum
 typedef struct
 {
     queue_cmd_t cmd;
-    EvLoopEvent *evp;
+    EvLoopEvent* evp;
     union
     {
         int new_period_ms;
     };
 } queue_msg_t;
 
-static std::list<EvLoopEvent *> eventList = {};
+static std::list<EvLoopEvent*> eventList = {};
 static QueueHandle_t xEventQueue = NULL;
 
-static bool compare(const EvLoopEvent *first, const EvLoopEvent *second)
+static bool compare(const EvLoopEvent* first, const EvLoopEvent* second)
 {
     if (first->next_timeout_us <= second->next_timeout_us)
         return true;
     return false;
 }
-static void calculate_next_timeout(EvLoopEvent *ev)
+static void calculate_next_timeout(EvLoopEvent* ev)
 {
     ev->period_counter++;
     ev->next_timeout_us = ev->start_time_us + ev->period_us * ev->period_counter;
 }
 
-static void setup_period(EvLoopEvent *evp, int ms)
+static void setup_period(EvLoopEvent* evp, int ms)
 {
     if (ms < MIN_MS)
     {
@@ -72,14 +72,14 @@ static void setup_period(EvLoopEvent *evp, int ms)
     evp->period_counter = 0;
 }
 
-static esp_err_t evloop_post(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int32_t id, void *data, size_t data_size)
+static esp_err_t evloop_post(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int32_t id, void* data, size_t data_size)
 {
     if (loop_handle == NULL)
         return esp_event_post(loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
     return esp_event_post_to(loop_handle, loop_base, id, data, data_size, pdMS_TO_TICKS(POST_WAIT_MS));
 }
 
-static void event_task(void *)
+static void event_task(void*)
 {
     queue_msg_t msg;
     TickType_t ticks;
@@ -116,7 +116,7 @@ static void event_task(void *)
                 eventList.push_back(msg.evp);
                 break;
             case CMD_NEW_PERIOD:
-                ESP_LOGI(TAG, "%s: New period %d us (%f Hz) for %s", __func__, msg.new_period_ms, (float)(1000.0/msg.new_period_ms), msg.evp->loop_base);
+                // ESP_LOGI(TAG, "%s: New period %d us (%f Hz) for %s", __func__, msg.new_period_ms, (float)(1000.0 / msg.new_period_ms), msg.evp->loop_base);
                 setup_period(msg.evp, msg.new_period_ms);
                 calculate_next_timeout(msg.evp);
                 break;
@@ -137,7 +137,7 @@ static void event_task(void *)
             // ESP_LOGW(TAG, "Posting %lld us timer to %s", ev->period_us, ev->loop_base);
             esp_err_t err = evloop_post(ev->loop_handle, ev->loop_base, ev->id, ev->data, ev->data_size);
             if (err != ESP_OK)
-                ESP_LOGE(TAG, "Failed to send event %d to %s",ev->id, ev->loop_base);
+                ESP_LOGE(TAG, "Failed to send event %d to %s", ev->id, ev->loop_base);
             if (ev->periodic)
                 calculate_next_timeout(ev);
             else
@@ -150,7 +150,7 @@ static void event_task(void *)
     }
 }
 
-eventer_t eventer_add(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int ms, bool periodic, int id, void *data, size_t data_size)
+eventer_t eventer_add(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, int ms, bool periodic, int id, void* data, size_t data_size)
 {
     if (ms < MIN_MS)
     {
@@ -168,18 +168,22 @@ eventer_t eventer_add(esp_event_loop_handle_t loop_handle, esp_event_base_t loop
     setup_period(evp, ms);
     calculate_next_timeout(evp);
 
-    queue_msg_t msg = {CMD_ADD, evp, 0};
+    queue_msg_t msg = { CMD_ADD, evp, 0 };
     if (pdTRUE == xQueueSend(xEventQueue, &msg, 0))
         return (eventer_t)evp;
     delete evp;
     return NULL;
 }
 
-eventer_t eventer_add_periodic(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, esp_event_handler_t event_handler, int id, int ms, void *data, size_t data_size)
+eventer_t eventer_add_periodic(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, esp_event_handler_t event_handler, int id, int ms, void* data, size_t data_size)
 {
     eventer_t e = eventer_add(loop_handle, loop_base, ms, true, id, data, data_size);
-    if (ESP_OK == esp_event_handler_register_with(loop_handle, loop_base, id, event_handler, data))
-        return e;
+    if (e)
+    {
+        if (ESP_OK == esp_event_handler_register_with(loop_handle, loop_base, id, event_handler, data))
+            return e;
+        eventer_remove(e);
+    }
     return NULL;
 }
 
@@ -188,8 +192,8 @@ void eventer_remove(eventer_t ev)
     if (ev == NULL || xEventQueue == NULL)
         return;
 
-    auto evp = (EvLoopEvent *)ev;
-    queue_msg_t msg = {.cmd = CMD_REMOVE, .evp = evp, .new_period_ms = 0};
+    auto evp = (EvLoopEvent*)ev;
+    queue_msg_t msg = { .cmd = CMD_REMOVE, .evp = evp, .new_period_ms = 0 };
     xQueueSend(xEventQueue, &msg, 0);
 }
 
@@ -198,13 +202,13 @@ bool eventer_set_period(eventer_t ev, int ms)
     if (ev == NULL || xEventQueue == NULL)
         return false;
 
-    auto evp = (EvLoopEvent *)ev;
+    auto evp = (EvLoopEvent*)ev;
     if (ms < MIN_MS)
     {
         ESP_LOGE(TAG, "%s: Invalid period, must be %d or bigger", __func__, ms);
         return false;
     }
-    queue_msg_t msg = {.cmd = CMD_NEW_PERIOD, .evp = evp, .new_period_ms = ms};
+    queue_msg_t msg = { .cmd = CMD_NEW_PERIOD, .evp = evp, .new_period_ms = ms };
     return pdTRUE == xQueueSend(xEventQueue, &msg, 0);
 }
 
@@ -217,6 +221,6 @@ void eventer_init()
 
 void eventer_deinit()
 {
-    queue_msg_t msg = {.cmd = CMD_EXIT, .evp = NULL, .new_period_ms = 0};
+    queue_msg_t msg = { .cmd = CMD_EXIT, .evp = NULL, .new_period_ms = 0 };
     xQueueSend(xEventQueue, &msg, 0);
 }
