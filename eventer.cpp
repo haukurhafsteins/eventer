@@ -154,7 +154,7 @@ eventer_t eventer_add(esp_event_loop_handle_t loop_handle, esp_event_base_t loop
 {
     if (ms < MIN_MS)
     {
-        ESP_LOGE(TAG, "%s: Invalid period, must be 1 or bigger", __func__);
+        ESP_LOGE(TAG, "%s: Invalid period, must be %d or bigger", __func__, MIN_MS);
         return NULL;
     }
     auto evp = new EvLoopEvent();
