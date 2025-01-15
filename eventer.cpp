@@ -187,6 +187,18 @@ eventer_t eventer_add_periodic(esp_event_loop_handle_t loop_handle, esp_event_ba
     return NULL;
 }
 
+eventer_t eventer_add_oneshot(esp_event_loop_handle_t loop_handle, esp_event_base_t loop_base, esp_event_handler_t event_handler, int id, int ms, void* data, size_t data_size)
+{
+    eventer_t e = eventer_add(loop_handle, loop_base, ms, false, id, data, data_size);
+    if (e)
+    {
+        if (ESP_OK == esp_event_handler_register_with(loop_handle, loop_base, id, event_handler, data))
+            return e;
+        eventer_remove(e);
+    }
+    return NULL;
+}
+
 void eventer_remove(eventer_t ev)
 {
     if (ev == NULL || xEventQueue == NULL)
